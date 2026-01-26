@@ -65,9 +65,8 @@ class MotorDataset(Dataset):
     def __getitem__(self, index):
         return self.X[index], self.y[index]
     
-def get_data():
-    MOTOR = "2D"
-    PATH = f"../dataset/{MOTOR}/"
+def get_data(motor):
+    PATH = f"../dataset/{motor}/"
     TRAIN_FILE = "_all_scaled_train.csv"
     TEST_FILE = "_all_scaled_test.csv"
 
@@ -93,32 +92,25 @@ def get_data():
 
 # ------------------- Autoencoder Functions ------------------- #
 
-def coder_dataset():
-    train_data, test_data = get_data()
-
+def coder_dataset(coder_train_data, coder_test_data):
     target = ['hysteresis', 'joule']
 
-    train_dataset = MotorDataset(train_data.drop(columns = target), train_data[target])
-    test_dataset = MotorDataset(test_data.drop(columns = target), test_data[target])
+    coder_train_dataset = MotorDataset(coder_train_data.drop(columns = target), coder_train_data[target])
+    coder_test_dataset = MotorDataset(coder_test_data.drop(columns = target), coder_test_data[target])
 
-    return train_dataset, test_dataset
+    return coder_train_dataset, coder_test_dataset
 
 
-def coder_dataloader(batch_size = 128):
-    train_dataset, test_dataset = coder_dataset()
-
-    coder_train_loader = DataLoader(train_dataset, batch_size = batch_size, shuffle = True)
-    coder_test_loader = DataLoader(test_dataset, batch_size = batch_size, shuffle = True)
+def coder_dataloader(coder_train_dataset, coder_test_dataset, batch_size = 128):
+    coder_train_loader = DataLoader(coder_train_dataset, batch_size = batch_size, shuffle = True)
+    coder_test_loader = DataLoader(coder_test_dataset, batch_size = batch_size, shuffle = True)
 
     return coder_train_loader, coder_test_loader
 
 
-def coder():
-    coder_train_loader, coder_test_loader = coder_dataloader()
-
+def train_coder(coder_train_loader, coder_test_loader, learning_rate = 1e-3, epochs = 100, latent_dim = 20):
     X_sample, _ = next(iter(coder_train_loader))
     input_dim = X_sample.shape[1]
-    latent_dim = 20
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -126,7 +118,7 @@ def coder():
     autoencoder_model.to(device)
 
     criterion = nn.MSELoss()
-    optimizer = optim.Adam(autoencoder_model.parameters(), lr=1e-3)
+    optimizer = optim.Adam(autoencoder_model.parameters(), lr = learning_rate)
     epochs = 100
 
     for epoch in range(epochs):
@@ -142,22 +134,16 @@ def coder():
     
     return autoencoder_model
 
-# --------------------------------------------------------- #
-
-# ------------------- Model Functions ------------------- #
-
-def model_dataset():
-    train_data, test_data = get_data()
-    autoencoder_model = coder()
+def encoded_dataset(coder, train_data, test_data):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     target = ['hysteresis', 'joule']
 
-    encoded_train = autoencoder_model.encoder(
+    encoded_train = coder.encoder(
         torch.tensor(train_data.drop(columns=target).values, dtype=torch.float32).to(device)
     ).cpu().detach().numpy()
 
-    encoded_test = autoencoder_model.encoder(
+    encoded_test = coder.encoder(
         torch.tensor(test_data.drop(columns=target).values, dtype=torch.float32).to(device)
     ).cpu().detach().numpy()
 
@@ -166,21 +152,19 @@ def model_dataset():
 
     return model_train_dataset, model_test_dataset
 
+# --------------------------------------------------------- #
 
-def model_dataloader():
-    model_train_dataset, model_test_dataset = model_dataset()
+# ------------------- Model Functions ------------------- #
 
-    batch_size = 128
 
+def model_dataloader(model_train_dataset, model_test_dataset, batch_size = 128):
     model_train_loader = DataLoader(model_train_dataset, batch_size=batch_size, shuffle=True)
     model_test_loader = DataLoader(model_test_dataset, batch_size=batch_size, shuffle=True)
     
     return model_train_loader, model_test_loader
 
 
-def model():
-    model_train_loader, model_test_loader = model_dataloader()
-
+def model(model_train_loader, model_test_loader):
     input_dim = model_train_loader.shape[1]
     output_dim = 2
 
