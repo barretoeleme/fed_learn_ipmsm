@@ -9,9 +9,35 @@ requires-python = ">=3.9"
 dependencies = [
     "flwr >= 1.25.0",
     "pandas",
-    "scikit_learn",
+    "scikit-learn",
     "torch >= 2.8.0",
 ]
 
 [tool.setuptools]
-py-modules = []
+package-dir = {"" = "motors"}
+
+[tool.flwr.app]
+publisher = "barretoleme"
+
+[tool.flwr.app.components]
+# Using dot notation to point through the 'code' package
+clientapp = "src.client:app"
+serverapp = "src.server:app"
+
+[tool.flwr.federations]
+default = "local-simulation"
+
+[tool.flwr.federations.local-simulation]
+options.num-supernodes = 10
+
+[tool.flwr.federations.local-simulation-gpu]
+options.num-supernodes = 1
+options.backend.client-resources.num-cpus = 1
+options.backend.client-resources.num-gpus = 0.2
+
+[tool.flwr.app.config]
+num-server-rounds = 3
+fraction-evaluate = 0.5
+local-epochs = 1
+learning-rate = 0.1
+batch-size = 128
