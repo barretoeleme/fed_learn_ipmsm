@@ -5,6 +5,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_percentage_error
 import datetime
+from pathlib import Path
 
 # --------------------------------------------------------- #
 
@@ -66,7 +67,7 @@ class MotorDataset(Dataset):
         return self.X[index], self.y[index]
     
 def get_data(motor):
-    PATH = f"../dataset/{motor}/"
+    PATH = str(Path(__file__).resolve().parent.parent / "dataset" / motor) + "/"
     TRAIN_FILE = "_all_scaled_train.csv"
     TEST_FILE = "_all_scaled_test.csv"
 
@@ -87,6 +88,9 @@ def get_data(motor):
     test_data['joule'] = pd.read_csv(f'{PATH}joule{TEST_FILE}')['total']
 
     return train_data, test_data
+
+def to_array_record(state_dict):
+    return ArrayRecord(arrays={k: v.detach().cpu().numpy() for k, v in state_dict.items()})
 
 # --------------------------------------------------------- #
 
@@ -112,7 +116,7 @@ def train_coder(coder_train_loader, coder_test_loader, learning_rate = 1e-3, epo
     X_sample, _ = next(iter(coder_train_loader))
     input_dim = X_sample.shape[1]
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cpu")
 
     autoencoder_model = Autoencoder(input_dim, latent_dim)
     autoencoder_model.to(device)
@@ -135,7 +139,7 @@ def train_coder(coder_train_loader, coder_test_loader, learning_rate = 1e-3, epo
     return autoencoder_model
 
 def encoded_dataset(coder, train_data, test_data):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cpu")
 
     target = ['hysteresis', 'joule']
 
@@ -165,7 +169,8 @@ def model_dataloader(model_train_dataset, model_test_dataset, batch_size = 128):
 
 
 def model(model_train_loader, model_test_loader):
-    input_dim = model_train_loader.shape[1]
+    X_sample, _ = next(iter(model_train_loader))
+    input_dim = X_sample.shape[1]
     output_dim = 2
 
     model = RegressionModel(input_dim, output_dim, neurons = 10, layers = 2)
@@ -185,28 +190,4 @@ def model(model_train_loader, model_test_loader):
     time = datetime.datetime.now()
     print(f"\tFinished training model at {time}.\n")
 
-    y_pred_list = []
-    y_test_list = []
-
-    model.eval()
-
-    with torch.no_grad():
-        for X, y in model_test_loader:
-            pred_test = model(X)
-            y_pred_list.append(pred_test)
-            y_test_list.append(y)
-
-    y_pred = torch.cat(y_pred_list)
-    y_test = torch.cat(y_test_list)
-
-    hys_score = r2_score(y_test[:, 0], y_pred[:, 0])
-    hys_mse = mean_squared_error(y_test[:, 0], y_pred[:, 0])
-    hys_mape = mean_absolute_percentage_error(y_test[:, 0], y_pred[:, 0])
-
-    jou_score = r2_score(y_test[:, 1], y_pred[:, 1])
-    jou_mse = mean_squared_error(y_test[:, 1], y_pred[:, 1])
-    jou_mape = mean_absolute_percentage_error(y_test[:, 1], y_pred[:, 1])
-
-    print(f"\tSpecs:")
-    print(f"\t\thys_score: {hys_score}, hys_mse: {hys_mse}, hys_mape: {hys_mape}.\n")
-    print(f"\t\tjou_score: {jou_score}, jou_mse: {jou_mse}, jou_mape: {jou_mape}.\n\n")
+    return model
