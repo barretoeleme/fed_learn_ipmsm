@@ -44,7 +44,7 @@ class MotorDataset(Dataset):
         return self.X[index], self.y[index]
     
 def get_data(motor):
-    PATH = str(Path(__file__).resolve().parent.parent / "dataset" / motor) + "/"
+    PATH = f"../original_dataset/{motor}/"
     TRAIN_FILE = "_all_scaled_train.csv"
     TEST_FILE = "_all_scaled_test.csv"
 
@@ -88,6 +88,7 @@ def train_coder(coder, train_loader, learning_rate = 1e-3, epochs = 100):
     optimizer = optim.Adam(coder.parameters(), lr = learning_rate)
 
     for epoch in range(epochs):
+        print("funcionando")
         coder.train()
         for data, _ in train_loader:
             data = data.to(device)
@@ -118,33 +119,41 @@ def encoded_dataset(coder, train_data, test_data):
 
     return model_train_dataset, model_test_dataset
 
-train_data, test_data = get_data("2D")
-train_dataset, test_dataset = get_dataset(train_data, test_data)
-train_loader, test_loader = get_dataloader(train_dataset, test_dataset)
+motors = ["2D", "Nabla", "V"]
 
-X_sample, _ = next(iter(train_loader))
-input_dim = X_sample.shape[1]
+for motor in motors:
+    # data loading
+    train_data, test_data = get_data("2D")
+    train_dataset, test_dataset = get_dataset(train_data, test_data)
+    train_loader, test_loader = get_dataloader(train_dataset, test_dataset)
 
-coder = Autoencoder(input_dim=input_dim)
-coder = train_coder(coder = coder, train_loader = train_loader)
-encoded_train_data, encoded_test_data = encoded_dataset(coder, train_data, test_data)
+    # setting input dim
+    X_sample, _ = next(iter(train_loader))
+    input_dim = X_sample.shape[1]
 
-# Converte tensores para numpy
-X_train_encoded = encoded_train_data.X.numpy()
-y_train_encoded = encoded_train_data.y.numpy()
+    # setting up autoencoder
+    coder = Autoencoder(input_dim=input_dim)
+    coder = train_coder(coder = coder, train_loader = train_loader)
+    encoded_train_data, encoded_test_data = encoded_dataset(coder, train_data, test_data)
 
-X_test_encoded = encoded_test_data.X.numpy()
-y_test_encoded = encoded_test_data.y.numpy()
+    X_train_encoded = encoded_train_data.X.numpy()
+    y_train_encoded = encoded_train_data.y.numpy()
 
-# Cria nomes para as colunas latentes
-latent_dim = X_train_encoded.shape[1]
-latent_columns = [f"latent_{i}" for i in range(latent_dim)]
+    X_test_encoded = encoded_test_data.X.numpy()
+    y_test_encoded = encoded_test_data.y.numpy()
 
-# Cria DataFrame
-df_encoded_train = pd.DataFrame(X_train_encoded, columns=latent_columns)
-df_encoded_train["hysteresis"] = y_train_encoded[:, 0]
-df_encoded_train["joule"] = y_train_encoded[:, 1]
+    latent_dim = X_train_encoded.shape[1]
+    latent_columns = [f"latent_{i}" for i in range(latent_dim)]
 
-# Salva
-df_encoded_train.to_csv("encoded_train_2D.csv", index=False)
+    df_encoded_train = pd.DataFrame(X_train_encoded, columns=latent_columns)
+    df_encoded_train["hysteresis"] = y_train_encoded[:, 0]
+    df_encoded_train["joule"] = y_train_encoded[:, 1]
+
+    df_encoded_test = pd.DataFrame(X_test_encoded, columns=latent_columns)
+    df_encoded_test["hysteresis"] = y_test_encoded[:, 0]
+    df_encoded_test["joule"] = y_test_encoded[:, 1]
+
+    # Salva
+    df_encoded_train.to_csv(f"../encoded_dataset/{motor}/encoded_train_2D.csv", index=False)
+    df_encoded_test.to_csv(f"../encoded_dataset/{motor}/encoded_test_2D.csv", index=False)
 
