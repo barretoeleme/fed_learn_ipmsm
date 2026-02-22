@@ -1,80 +1,79 @@
+"""motors: A Flower / PyTorch app."""
+
 import torch
 from flwr.app import ArrayRecord, Context, Message, MetricRecord, RecordDict
 from flwr.clientapp import ClientApp
-from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_percentage_error
 
-from src import task
+from src.task import RegressionModel, load_data
+from src.task import test as test_fn
+from src.task import train as train_fn
 
+# Flower ClientApp
 app = ClientApp()
+
 
 @app.train()
 def train(msg: Message, context: Context):
-    print("TRAIN STARTED")
-    
-    train_data, test_data = task.get_data("2D")
-    
-    coder_train_dataset, coder_test_dataset = task.coder_dataset(train_data, test_data)
-    coder_train_dataloader, coder_test_dataloader = task.coder_dataloader(coder_train_dataset, coder_test_dataset)
-    coder = task.train_coder(coder_train_dataloader, coder_test_dataloader)
-    
-    model_train_dataset, model_test_dataset = task.encoded_dataset(coder, train_data, test_data)
-    model_train_dataloader, model_test_dataloader = task.model_dataloader(model_train_dataset, model_test_dataset)
-    model = task.model(model_train_dataloader, model_test_dataloader)
+    """Train the model on local data."""
 
+    # Load the model and initialize it with the received weights
+    model = RegressionModel()
+    model.load_state_dict(msg.content["arrays"].to_torch_state_dict())
+
+    device = torch.device("cpu")
+    model.to(device)
+
+    # Load the data
+    partition_id = context.node_config["partition-id"]
+    num_partitions = context.node_config["num-partitions"]
+    batch_size = context.run_config["batch-size"]
+
+    train_loader, _ = load_data(partition_id, num_partitions, batch_size)
+
+    # Call the training function
+    train_loss = train_fn(
+        model=model,
+        train_loader=train_loader,
+        device=device,
+        epochs=context.run_config["local-epochs"],
+        lr=msg.content["config"]["lr"],
+    )
+
+    # Construct and return reply Message
     model_record = ArrayRecord(model.state_dict())
-    coder_record = ArrayRecord(coder.state_dict())
+    metrics = {
+        "train_loss": train_loss,
+        "num-examples": len(train_loader.dataset),
+    }
+    metric_record = MetricRecord(metrics)
 
-    content = RecordDict({"model": model_record, "coder": coder_record,})
-    
+    content = RecordDict({"arrays": model_record, "metrics": metric_record})
     return Message(content=content, reply_to=msg)
 
-@app.evaluate
+
+@app.evaluate()
 def evaluate(msg: Message, context: Context):
-    y_pred_list = []
-    y_test_list = []
+    """Evaluate the model on local data."""
 
-    train_data, test_data = task.get_data("2D")
+    # Load the model and initialize it with the received weights
+    model = RegressionModel()
+    model.load_state_dict(msg.content["arrays"].to_torch_state_dict())
+    device = torch.device("cpu")
+    model.to(device)
 
-    coder_train_dataset, coder_test_dataset = task.coder_dataset(train_data, test_data)
-    coder_train_dataloader, coder_test_dataloader = task.coder_dataloader(coder_train_dataset, coder_test_dataset)
-    coder = task.train_coder(coder_train_dataloader, coder_test_dataloader)
-    
-    model_train_dataset, model_test_dataset = task.encoded_dataset(coder, train_data, test_data)
-    model_train_dataloader, model_test_dataloader = task.model_dataloader(model_train_dataset, model_test_dataset)
-    model = task.model(model_train_dataloader, model_test_dataloader)
+    # Load the data
+    partition_id = context.node_config["partition-id"]
+    num_partitions = context.node_config["num-partitions"]
+    batch_size = context.run_config["batch-size"]
 
-    model.eval()
+    _, test_loader = load_data(partition_id, num_partitions, batch_size)
 
-    with torch.no_grad():
-        for X, y in model_test_dataloader:
-            pred_test = model(X)
-            y_pred_list.append(pred_test)
-            y_test_list.append(y)
+    # Call the evaluation function
+    eval_loss = test_fn(model, test_loader, device)
 
-    y_pred = torch.cat(y_pred_list)
-    y_test = torch.cat(y_test_list)
-
-    hys_score = r2_score(y_test[:, 0], y_pred[:, 0])
-    hys_mse = mean_squared_error(y_test[:, 0], y_pred[:, 0])
-    hys_mape = mean_absolute_percentage_error(y_test[:, 0], y_pred[:, 0])
-
-    jou_score = r2_score(y_test[:, 1], y_pred[:, 1])
-    jou_mse = mean_squared_error(y_test[:, 1], y_pred[:, 1])
-    jou_mape = mean_absolute_percentage_error(y_test[:, 1], y_pred[:, 1])
-
-    print(f"\tSpecs:")
-    print(f"\t\thys_score: {hys_score}, hys_mse: {hys_mse}, hys_mape: {hys_mape}.\n")
-    print(f"\t\tjou_score: {jou_score}, jou_mse: {jou_mse}, jou_mape: {jou_mape}.\n\n")
-
-    metrics = {
-        "hys_score" : hys_score,
-        "hys_mse" : hys_mse,
-        "hys_mape" : hys_mape,
-        "jou_score" : jou_score,
-        "jou_mse" : jou_mse,
-        "jou_mape" : jou_mape,
-    }
-
+    # Construct and return reply Message
+    metrics = {"eval_loss": eval_loss, "num-examples": len(test_loader.dataset)}
     metric_record = MetricRecord(metrics)
-    content = RecordDict({"metrics" : metric_record})
+
+    content = RecordDict({"metrics": metric_record})
     return Message(content=content, reply_to=msg)

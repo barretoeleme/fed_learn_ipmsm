@@ -28,16 +28,18 @@ serverapp = "src.server:app"
 default = "local-simulation"
 
 [tool.flwr.federations.local-simulation]
-options.num-supernodes = 10
+options.num-supernodes = 3
 
 [tool.flwr.federations.local-simulation-gpu]
-options.num-supernodes = 1
+options.num-supernodes = 3
 options.backend.client-resources.num-cpus = 1
-options.backend.client-resources.num-gpus = 0.2
+options.backend.client-resources.num-gpus = 0
 
 [tool.flwr.app.config]
-num-server-rounds = 3
-fraction-evaluate = 0.5
-local-epochs = 1
-learning-rate = 0.1
+num-server-rounds = 80
+fraction-evaluate = 1.0
+local-epochs = 3
+learning-rate = 0.0005
 batch-size = 128
+
+RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO=0
