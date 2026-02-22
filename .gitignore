@@ -1,3 +1,4 @@
 /myenv
+.venv
 /motors/fed_learn_ipmsm.egg-info
 *.pt
