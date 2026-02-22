@@ -154,6 +154,6 @@ for motor in motors:
     df_encoded_test["joule"] = y_test_encoded[:, 1]
 
     # Salva
-    df_encoded_train.to_csv(f"../encoded_dataset/{motor}/encoded_train_2D.csv", index=False)
-    df_encoded_test.to_csv(f"../encoded_dataset/{motor}/encoded_test_2D.csv", index=False)
+    df_encoded_train.to_csv(f"../encoded_dataset/{motor}/encoded_train.csv", index=False)
+    df_encoded_test.to_csv(f"../encoded_dataset/{motor}/encoded_test.csv", index=False)
 
