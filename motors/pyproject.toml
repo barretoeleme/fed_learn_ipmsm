@@ -13,8 +13,8 @@ dependencies = [
     "torch >= 2.8.0",
 ]
 
-[tool.setuptools]
-package-dir = {"" = "motors"}
+[tool.hatch.build.targets.wheel]
+packages = ["."]
 
 [tool.flwr.app]
 publisher = "barretoleme"
@@ -28,7 +28,7 @@ serverapp = "src.server:app"
 default = "local-simulation"
 
 [tool.flwr.federations.local-simulation]
-options.num-supernodes = 10
+options.num-supernodes = 2
 
 [tool.flwr.federations.local-simulation-gpu]
 options.num-supernodes = 1

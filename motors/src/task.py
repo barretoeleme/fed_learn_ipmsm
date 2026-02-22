@@ -68,25 +68,27 @@ class MotorDataset(Dataset):
         return self.X[index], self.y[index]
     
 def get_data(motor):
-    PATH = str(Path(__file__).resolve().parent.parent / "dataset" / motor) + "/"
+    PROJECT_ROOT = Path(__file__).resolve().parents[2]
+    DATASET_DIR = PROJECT_ROOT / "dataset"
+    PATH = DATASET_DIR / motor
     TRAIN_FILE = "_all_scaled_train.csv"
     TEST_FILE = "_all_scaled_test.csv"
 
     train_data = pd.DataFrame()
 
-    train_data = pd.concat([train_data, pd.read_csv(f'{PATH}idiq{TRAIN_FILE}').drop(columns = "Unnamed: 0")], axis = 1)
-    train_data['speed'] = pd.read_csv(f'{PATH}speed{TRAIN_FILE}')['N']
-    train_data = pd.concat([train_data, pd.read_csv(f'{PATH}xgeom{TRAIN_FILE}').drop(columns = "Unnamed: 0")], axis = 1)
-    train_data['hysteresis'] = pd.read_csv(f'{PATH}hysteresis{TRAIN_FILE}')['total']
-    train_data['joule'] = pd.read_csv(f'{PATH}joule{TRAIN_FILE}')['total']
+    train_data = pd.concat([train_data, pd.read_csv(f'{PATH}/idiq{TRAIN_FILE}').drop(columns = "Unnamed: 0")], axis = 1)
+    train_data['speed'] = pd.read_csv(f'{PATH}/speed{TRAIN_FILE}')['N']
+    train_data = pd.concat([train_data, pd.read_csv(f'{PATH}/xgeom{TRAIN_FILE}').drop(columns = "Unnamed: 0")], axis = 1)
+    train_data['hysteresis'] = pd.read_csv(f'{PATH}/hysteresis{TRAIN_FILE}')['total']
+    train_data['joule'] = pd.read_csv(f'{PATH}/joule{TRAIN_FILE}')['total']
 
     test_data = pd.DataFrame()
 
-    test_data = pd.concat([test_data, pd.read_csv(f'{PATH}idiq{TEST_FILE}').drop(columns = "Unnamed: 0")], axis = 1)
-    test_data['speed'] = pd.read_csv(f'{PATH}speed{TEST_FILE}')['N']
-    test_data = pd.concat([test_data, pd.read_csv(f'{PATH}xgeom{TEST_FILE}').drop(columns = "Unnamed: 0")], axis = 1)
-    test_data['hysteresis'] = pd.read_csv(f'{PATH}hysteresis{TEST_FILE}')['total']
-    test_data['joule'] = pd.read_csv(f'{PATH}joule{TEST_FILE}')['total']
+    test_data = pd.concat([test_data, pd.read_csv(f'{PATH}/idiq{TEST_FILE}').drop(columns = "Unnamed: 0")], axis = 1)
+    test_data['speed'] = pd.read_csv(f'{PATH}/speed{TEST_FILE}')['N']
+    test_data = pd.concat([test_data, pd.read_csv(f'{PATH}/xgeom{TEST_FILE}').drop(columns = "Unnamed: 0")], axis = 1)
+    test_data['hysteresis'] = pd.read_csv(f'{PATH}/hysteresis{TEST_FILE}')['total']
+    test_data['joule'] = pd.read_csv(f'{PATH}/joule{TEST_FILE}')['total']
 
     return train_data, test_data
 
@@ -167,19 +169,19 @@ def model_dataloader(model_train_dataset, model_test_dataset, batch_size = 128):
     
     return model_train_loader, model_test_loader
 
-
+# mudar nome pra train
 def model(model_train_loader, model_test_loader):
     X_sample, _ = next(iter(model_train_loader))
     input_dim = X_sample.shape[1]
     output_dim = 2
 
     model = RegressionModel(input_dim, output_dim, neurons = 1, layers = 2)
+    model.train()
 
     loss_func = nn.MSELoss()
     optimizer = torch.optim.SGD(model.parameters(), lr = 0.1)
 
     for a in range(100):
-        model.train()
         for X, y in model_train_loader:
             optimizer.zero_grad()
             pred_train = model(X)

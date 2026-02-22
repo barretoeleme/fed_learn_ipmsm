@@ -21,14 +21,14 @@ def train(msg: Message, context: Context):
     model_train_dataloader, model_test_dataloader = task.model_dataloader(model_train_dataset, model_test_dataset)
     model = task.model(model_train_dataloader, model_test_dataloader)
 
-    model_record = ArrayRecord(model.state_dict())
-    coder_record = ArrayRecord(coder.state_dict())
+    arrays = ArrayRecord(model.state_dict())
 
-    content = RecordDict({"model": model_record, "coder": coder_record,})
-    
-    return Message(content=content, reply_to=msg)
+    return Message(
+        content=RecordDict({"arrays": arrays}),
+        reply_to=msg,
+    )
 
-@app.evaluate
+@app.evaluate()
 def evaluate(msg: Message, context: Context):
     y_pred_list = []
     y_test_list = []
