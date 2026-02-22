@@ -1,4 +1,5 @@
-/myenv
+myenv
 .venv
-/motors/fed_learn_ipmsm.egg-info
+motors/fed_learn_ipmsm.egg-info
 *.pt
+motors/src/__pycache__
