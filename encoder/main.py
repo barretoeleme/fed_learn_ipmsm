@@ -80,7 +80,7 @@ def get_dataloader(coder_train_dataset, coder_test_dataset, batch_size = 128):
 
     return coder_train_loader, coder_test_loader
 
-def train_coder(coder, train_loader, learning_rate = 1e-3, epochs = 100):
+def train_coder(coder, train_loader, learning_rate = 1e-3, epochs = 50):
     device = torch.device("cpu")
     coder.to(device)
 
