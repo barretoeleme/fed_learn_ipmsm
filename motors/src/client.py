@@ -16,21 +16,18 @@ app = ClientApp()
 def train(msg: Message, context: Context):
     """Train the model on local data."""
 
-    # Load the model and initialize it with the received weights
     model = RegressionModel()
     model.load_state_dict(msg.content["arrays"].to_torch_state_dict())
 
     device = torch.device("cpu")
     model.to(device)
 
-    # Load the data
     partition_id = context.node_config["partition-id"]
     num_partitions = context.node_config["num-partitions"]
     batch_size = context.run_config["batch-size"]
 
     train_loader, _ = load_data(partition_id, num_partitions, batch_size)
 
-    # Call the training function
     train_loss = train_fn(
         model=model,
         train_loader=train_loader,
@@ -39,7 +36,6 @@ def train(msg: Message, context: Context):
         lr=msg.content["config"]["lr"],
     )
 
-    # Construct and return reply Message
     model_record = ArrayRecord(model.state_dict())
     metrics = {
         "train_loss": train_loss,
@@ -55,23 +51,19 @@ def train(msg: Message, context: Context):
 def evaluate(msg: Message, context: Context):
     """Evaluate the model on local data."""
 
-    # Load the model and initialize it with the received weights
     model = RegressionModel()
     model.load_state_dict(msg.content["arrays"].to_torch_state_dict())
     device = torch.device("cpu")
     model.to(device)
 
-    # Load the data
     partition_id = context.node_config["partition-id"]
     num_partitions = context.node_config["num-partitions"]
     batch_size = context.run_config["batch-size"]
 
     _, test_loader = load_data(partition_id, num_partitions, batch_size)
 
-    # Call the evaluation function
     eval_loss = test_fn(model, test_loader, device)
 
-    # Construct and return reply Message
     metrics = {"eval_loss": eval_loss, "num-examples": len(test_loader.dataset)}
     metric_record = MetricRecord(metrics)
 

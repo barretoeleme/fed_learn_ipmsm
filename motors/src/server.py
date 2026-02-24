@@ -7,7 +7,6 @@ from flwr.serverapp.strategy import FedAvg
 
 from src.task import RegressionModel, test
 
-# Create ServerApp
 app = ServerApp()
 
 
@@ -15,19 +14,15 @@ app = ServerApp()
 def main(grid: Grid, context: Context) -> None:
     """Main entry point for the ServerApp."""
 
-    # Read run config
     fraction_evaluate: float = context.run_config["fraction-evaluate"]
     num_rounds: int = context.run_config["num-server-rounds"]
     lr: float = context.run_config["learning-rate"]
 
-    # Load global model
     global_model = RegressionModel()
     arrays = ArrayRecord(global_model.state_dict())
 
-    # Initialize FedAvg strategy
     strategy = FedAvg(fraction_evaluate=fraction_evaluate)
 
-    # Start strategy, run FedAvg for `num_rounds`
     result = strategy.start(
         grid=grid,
         initial_arrays = arrays,
@@ -36,7 +31,6 @@ def main(grid: Grid, context: Context) -> None:
         evaluate_fn = None,
     )
 
-    # Save final model to disk
     print("\nSaving final model to disk...")
     state_dict = result.arrays.to_torch_state_dict()
     torch.save(state_dict, "final_model.pt")
