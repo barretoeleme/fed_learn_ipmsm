@@ -60,6 +60,26 @@ def load_data(partition_id: int, num_partitions: int, batch_size = 128):
 
     return train_loader, test_loader
 
+def load_centralized_dataset(batch_size=128):
+    all_data = []
+
+    base_path = Path(__file__).resolve().parent.parent.parent / "encoded_dataset"
+
+    for motor in MOTORS:
+        path = base_path / motor
+
+        test_data = pd.read_csv(path / "encoded_test.csv")
+        all_data.append(test_data)
+
+    global_test = pd.concat(all_data, axis=0).reset_index(drop=True)
+
+    target = ['hysteresis', 'joule']
+
+    dataset = MotorDataset(global_test.drop(columns=target), global_test[target])
+    loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+
+    return loader
+
 def train(model, train_loader, device, epochs = 100, lr = 0.001):
     """Train the model on the training set."""
 
