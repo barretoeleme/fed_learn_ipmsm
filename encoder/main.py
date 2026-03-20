@@ -15,8 +15,7 @@ class Autoencoder(nn.Module):
             nn.ReLU(),
             nn.Linear(128, 64),
             nn.ReLU(),
-            nn.Linear(64, latent_dim),
-            nn.ReLU() # The bottleneck layer
+            nn.Linear(64, latent_dim)  # removido ReLU
         )
         # Decoder
         self.decoder = nn.Sequential(
@@ -76,12 +75,12 @@ def get_dataset(coder_train_data, coder_test_data):
 
 def get_dataloader(coder_train_dataset, coder_test_dataset, batch_size = 128):
     coder_train_loader = DataLoader(coder_train_dataset, batch_size = batch_size, shuffle = True)
-    coder_test_loader = DataLoader(coder_test_dataset, batch_size = batch_size, shuffle = True)
+    coder_test_loader = DataLoader(coder_test_dataset, batch_size = batch_size, shuffle = False)
 
     return coder_train_loader, coder_test_loader
 
 def train_coder(coder, train_loader, learning_rate = 1e-3, epochs = 50):
-    device = torch.device("cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     coder.to(device)
 
     criterion = nn.MSELoss()
@@ -102,17 +101,19 @@ def train_coder(coder, train_loader, learning_rate = 1e-3, epochs = 50):
     return coder
 
 def encoded_dataset(coder, train_data, test_data):
-    device = torch.device("cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     target = ['hysteresis', 'joule']
 
-    encoded_train = coder.encoder(
-        torch.tensor(train_data.drop(columns=target).values, dtype=torch.float32).to(device)
-    ).cpu().detach().numpy()
+    coder.eval()
+    with torch.no_grad():
+        encoded_train = coder.encoder(
+            torch.tensor(train_data.drop(columns=target).values, dtype=torch.float32).to(device)
+        ).cpu().numpy()
 
-    encoded_test = coder.encoder(
-        torch.tensor(test_data.drop(columns=target).values, dtype=torch.float32).to(device)
-    ).cpu().detach().numpy()
+        encoded_test = coder.encoder(
+            torch.tensor(test_data.drop(columns=target).values, dtype=torch.float32).to(device)
+        ).cpu().numpy()
 
     model_train_dataset = MotorDataset(pd.DataFrame(encoded_train), train_data[target])
     model_test_dataset = MotorDataset(pd.DataFrame(encoded_test), test_data[target])
@@ -123,7 +124,7 @@ motors = ["2D", "Nabla", "V"]
 
 for motor in motors:
     # data loading
-    train_data, test_data = get_data("2D")
+    train_data, test_data = get_data(motor)
     train_dataset, test_dataset = get_dataset(train_data, test_data)
     train_loader, test_loader = get_dataloader(train_dataset, test_dataset)
 
@@ -153,7 +154,5 @@ for motor in motors:
     df_encoded_test["hysteresis"] = y_test_encoded[:, 0]
     df_encoded_test["joule"] = y_test_encoded[:, 1]
 
-    # Salva
     df_encoded_train.to_csv(f"../encoded_dataset/{motor}/encoded_train.csv", index=False)
     df_encoded_test.to_csv(f"../encoded_dataset/{motor}/encoded_test.csv", index=False)
-
