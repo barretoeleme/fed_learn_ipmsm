@@ -3,3 +3,4 @@ myenv
 motors/fed_learn_ipmsm.egg-info
 *.pt
 motors/src/__pycache__
+data_analysis
