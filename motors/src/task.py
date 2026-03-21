@@ -10,7 +10,7 @@ MOTORS = ["2D", "Nabla", "V"]
 
 class RegressionModel(nn.Module):
     
-    def __init__(self, input_dim = 20, output_dim = 2, neurons = 200, layers = 1):
+    def __init__(self, input_dim = 20, output_dim = 2, neurons = 160, layers = 4):
         super().__init__()
 
         modules = []
