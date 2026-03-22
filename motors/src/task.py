@@ -1,10 +1,9 @@
-"""motors: A Flower / PyTorch app."""
-
 import torch
 import pandas as pd
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from pathlib import Path
+from sklearn.model_selection import train_test_split  # ✅ ADICIONADO
 
 MOTORS = ["2D", "Nabla", "V"]
 
@@ -25,8 +24,7 @@ class RegressionModel(nn.Module):
         self.linear = nn.Sequential(*modules)
         
     def forward(self, x):
-        x = self.linear(x)
-        return x
+        return self.linear(x)
 
 class MotorDataset(Dataset):
     def __init__(self, X, y):
@@ -52,8 +50,11 @@ def load_data(partition_id: int, num_partitions: int, batch_size = 128):
 
     target = ['hysteresis', 'joule']
 
+    # ✅ SPLIT 50/50 → eval (client)
+    eval_data, _ = train_test_split(test_data, test_size=0.5, random_state=42)
+
     train_dataset = MotorDataset(train_data.drop(columns = target), train_data[target])
-    test_dataset = MotorDataset(test_data.drop(columns = target), test_data[target])
+    test_dataset = MotorDataset(eval_data.drop(columns = target), eval_data[target])
 
     train_loader = DataLoader(train_dataset, batch_size = batch_size, shuffle = True)
     test_loader = DataLoader(test_dataset, batch_size = batch_size, shuffle = False)
@@ -69,7 +70,11 @@ def load_centralized_dataset(batch_size=128):
         path = base_path / motor
 
         test_data = pd.read_csv(path / "encoded_test.csv")
-        all_data.append(test_data)
+
+        # ✅ SPLIT 50/50 → test global (server)
+        _, test_split = train_test_split(test_data, test_size=0.5, random_state=42)
+
+        all_data.append(test_split)
 
     global_test = pd.concat(all_data, axis=0).reset_index(drop=True)
 
@@ -81,8 +86,6 @@ def load_centralized_dataset(batch_size=128):
     return loader
 
 def train(model, train_loader, device, epochs = 100, lr = 0.001):
-    """Train the model on the training set."""
-
     model.to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
