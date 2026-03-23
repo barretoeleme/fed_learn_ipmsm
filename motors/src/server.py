@@ -8,12 +8,13 @@ import pandas as pd
 from flwr.app import ArrayRecord, ConfigRecord, Context, MetricRecord
 from flwr.serverapp import Grid, ServerApp
 from flwr.serverapp.strategy import FedAvg
+from pathlib import Path
 
 from src.task import RegressionModel, test, load_centralized_dataset
 
 app = ServerApp()
 
-server_losses = []
+server_eval_losses = []
 
 @app.main()
 def main(grid: Grid, context: Context) -> None:
@@ -38,23 +39,26 @@ def main(grid: Grid, context: Context) -> None:
 
     rounds = sorted(result.train_metrics_clientapp.keys())
 
-    train_losses = []
-    eval_losses = []
+    client_train_losses = []
+    client_eval_losses = []
 
     for r in rounds:
-        train_losses.append(float(result.train_metrics_clientapp[r]["train_loss"]))
-        eval_losses.append(float(result.evaluate_metrics_clientapp[r]["eval_loss"]))
+        client_train_losses.append(float(result.train_metrics_clientapp[r]["train_loss"]))
+        client_eval_losses.append(float(result.evaluate_metrics_clientapp[r]["eval_loss"]))
 
-    server_losses_cut = server_losses[1:]
+    server_eval_losses_cut = server_eval_losses[1:]
 
     df = pd.DataFrame({
         "round": rounds,
-        "server_loss": server_losses_cut,
-        "train_loss": train_losses,
-        "eval_loss": eval_losses,
+        "server_eval_loss": server_eval_losses_cut,
+        "client_train_loss": client_train_losses,
+        "client_eval_loss": client_eval_losses,
     })
 
-    df.to_csv("federated_results.csv", index=False)
+    results_path = Path(__file__).resolve().parent.parent.parent / "results"
+    results_path.mkdir(parents=True, exist_ok=True)
+
+    df.to_csv(results_path / "results.csv", index=False)
 
     print("\nSaving final model to disk...")
     state_dict = result.arrays.to_torch_state_dict()
@@ -73,6 +77,6 @@ def global_evaluate(server_round: int, arrays: ArrayRecord) -> MetricRecord:
     test_dataloader = load_centralized_dataset()
     test_loss = test(model, test_dataloader, device)
 
-    server_losses.append(test_loss)
+    server_eval_losses.append(test_loss)
 
     return MetricRecord({"loss": test_loss})

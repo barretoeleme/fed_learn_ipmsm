@@ -3,7 +3,6 @@ import pandas as pd
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from pathlib import Path
-from sklearn.model_selection import train_test_split  # ✅ ADICIONADO
 
 MOTORS = ["2D", "Nabla", "V"]
 
@@ -43,47 +42,39 @@ def _motor_from_partition(partition_id: int) -> str:
 def load_data(partition_id: int, num_partitions: int, batch_size = 128):
     motor = _motor_from_partition(partition_id)
 
-    PATH = str(Path(__file__).resolve().parent.parent.parent / "encoded_dataset" / motor) + "/" 
+    PATH = str(Path(__file__).resolve().parent.parent.parent / "encoder/encoded_dataset" / motor) + "/" 
     
-    train_data = pd.read_csv(f"{PATH}encoded_train.csv") 
-    test_data = pd.read_csv(f"{PATH}encoded_test.csv")
+    train_data = pd.read_csv(f"{PATH}encoded_train.csv")
+    eval_data = pd.read_csv(f"{PATH}encoded_eval.csv")
 
     target = ['hysteresis', 'joule']
 
-    # ✅ SPLIT 50/50 → eval (client)
-    eval_data, _ = train_test_split(test_data, test_size=0.5, random_state=42)
+    train_dataset = MotorDataset(train_data.drop(columns=target), train_data[target])
+    eval_dataset = MotorDataset(eval_data.drop(columns=target), eval_data[target])
 
-    train_dataset = MotorDataset(train_data.drop(columns = target), train_data[target])
-    test_dataset = MotorDataset(eval_data.drop(columns = target), eval_data[target])
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    eval_loader = DataLoader(eval_dataset, batch_size=batch_size, shuffle=False)
 
-    train_loader = DataLoader(train_dataset, batch_size = batch_size, shuffle = True)
-    test_loader = DataLoader(test_dataset, batch_size = batch_size, shuffle = False)
-
-    return train_loader, test_loader
+    return train_loader, eval_loader
 
 def load_centralized_dataset(batch_size=128):
     all_data = []
 
-    base_path = Path(__file__).resolve().parent.parent.parent / "encoded_dataset"
+    base_path = Path(__file__).resolve().parent.parent.parent / "encoder/encoded_dataset"
 
     for motor in MOTORS:
         path = base_path / motor
-
         test_data = pd.read_csv(path / "encoded_test.csv")
-
-        # ✅ SPLIT 50/50 → test global (server)
-        _, test_split = train_test_split(test_data, test_size=0.5, random_state=42)
-
-        all_data.append(test_split)
+        all_data.append(test_data)
 
     global_test = pd.concat(all_data, axis=0).reset_index(drop=True)
 
     target = ['hysteresis', 'joule']
 
     dataset = MotorDataset(global_test.drop(columns=target), global_test[target])
-    loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+    global_test_loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
 
-    return loader
+    return global_test_loader
 
 def train(model, train_loader, device, epochs = 100, lr = 0.001):
     model.to(device)
