@@ -3,8 +3,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
-from flwr.app import ArrayRecord
-from pathlib import Path
 
 class Autoencoder(nn.Module):
     def __init__(self, input_dim, latent_dim = 20):
