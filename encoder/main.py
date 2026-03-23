@@ -122,37 +122,76 @@ def encoded_dataset(coder, train_data, test_data):
 
 motors = ["2D", "Nabla", "V"]
 
+from sklearn.model_selection import train_test_split
+
+motors = ["2D", "Nabla", "V"]
+
 for motor in motors:
     # data loading
     train_data, test_data = get_data(motor)
-    train_dataset, test_dataset = get_dataset(train_data, test_data)
-    train_loader, test_loader = get_dataloader(train_dataset, test_dataset)
 
-    # setting input dim
+    # =========================
+    # SPLIT 70 / 15 / 15
+    # =========================
+    full_data = pd.concat([train_data, test_data]).reset_index(drop=True)
+
+    train_df, temp_df = train_test_split(full_data, test_size=0.30, random_state=42)
+    eval_df, test_df = train_test_split(temp_df, test_size=0.5, random_state=42)
+
+    # =========================
+    # DATALOADER (só treino)
+    # =========================
+    train_dataset, _ = get_dataset(train_df, train_df)
+    train_loader, _ = get_dataloader(train_dataset, train_dataset)
+
+    # input dim
     X_sample, _ = next(iter(train_loader))
     input_dim = X_sample.shape[1]
 
-    # setting up autoencoder
+    # =========================
+    # TREINAR AUTOENCODER
+    # =========================
     coder = Autoencoder(input_dim=input_dim)
-    coder = train_coder(coder = coder, train_loader = train_loader)
-    encoded_train_data, encoded_test_data = encoded_dataset(coder, train_data, test_data)
+    coder = train_coder(coder=coder, train_loader=train_loader)
 
-    X_train_encoded = encoded_train_data.X.numpy()
-    y_train_encoded = encoded_train_data.y.numpy()
+    # =========================
+    # ENCODE (3 datasets)
+    # =========================
+    def encode(df):
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        target = ['hysteresis', 'joule']
 
-    X_test_encoded = encoded_test_data.X.numpy()
-    y_test_encoded = encoded_test_data.y.numpy()
+        coder.eval()
+        with torch.no_grad():
+            encoded = coder.encoder(
+                torch.tensor(df.drop(columns=target).values, dtype=torch.float32).to(device)
+            ).cpu().numpy()
+
+        return encoded, df[target].values
+
+    X_train_encoded, y_train_encoded = encode(train_df)
+    X_eval_encoded, y_eval_encoded = encode(eval_df)
+    X_test_encoded, y_test_encoded = encode(test_df)
 
     latent_dim = X_train_encoded.shape[1]
     latent_columns = [f"latent_{i}" for i in range(latent_dim)]
 
-    df_encoded_train = pd.DataFrame(X_train_encoded, columns=latent_columns)
-    df_encoded_train["hysteresis"] = y_train_encoded[:, 0]
-    df_encoded_train["joule"] = y_train_encoded[:, 1]
+    # =========================
+    # DATAFRAMES
+    # =========================
+    def build_df(X, y):
+        df = pd.DataFrame(X, columns=latent_columns)
+        df["hysteresis"] = y[:, 0]
+        df["joule"] = y[:, 1]
+        return df
 
-    df_encoded_test = pd.DataFrame(X_test_encoded, columns=latent_columns)
-    df_encoded_test["hysteresis"] = y_test_encoded[:, 0]
-    df_encoded_test["joule"] = y_test_encoded[:, 1]
+    df_encoded_train = build_df(X_train_encoded, y_train_encoded)
+    df_encoded_eval  = build_df(X_eval_encoded, y_eval_encoded)
+    df_encoded_test  = build_df(X_test_encoded, y_test_encoded)
 
+    # =========================
+    # SAVE
+    # =========================
     df_encoded_train.to_csv(f"../encoded_dataset/{motor}/encoded_train.csv", index=False)
+    df_encoded_eval.to_csv(f"../encoded_dataset/{motor}/encoded_eval.csv", index=False)
     df_encoded_test.to_csv(f"../encoded_dataset/{motor}/encoded_test.csv", index=False)
